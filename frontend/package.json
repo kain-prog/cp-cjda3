@@ -1,0 +1,28 @@
+{
+  "name": "condopack-cjda3-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host :: --port 5700"
+  },
+  "dependencies": {
+    "@web-condopack/auth": "^1.1.0",
+    "@web-condopack/contact": "^1.1.0",
+    "@web-condopack/home": "^1.1.0",
+    "@web-condopack/packages": "^1.1.0",
+    "@web-condopack/shared": "^1.1.0",
+    "@web-condopack/ui": "^1.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}

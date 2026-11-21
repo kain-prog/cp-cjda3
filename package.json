@@ -1,0 +1,11 @@
+{
+  "name": "condopack-cjda3",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build:backend": "pnpm --filter ./backend build",
+    "build:frontend": "pnpm --filter ./frontend build",
+    "update:condopack": "pnpm update \"@api-condopack/*\" \"@web-condopack/*\" --latest"
+  }
+}

@@ -1,0 +1,134 @@
+services:
+  # 1. Banco de Dados PostgreSQL 18 (Dev + Banco de Testes)
+  postgres:
+    image: postgres:18-alpine
+    container_name: cdpack_postgres-cjda3
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    command: >
+      postgres -c timezone='${TZ}'
+               -c shared_buffers=512MB
+               -c effective_cache_size=1536MB
+               -c work_mem=16MB
+               -c max_connections=120
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cdpack_network_cjda3
+
+  # 2. Cache e Fila BullMQ (Redis 7)
+  redis:
+    image: redis:7-alpine
+    container_name: cdpack_redis-cjda3
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 512mb --maxmemory-policy noeviction
+    ports:
+      - "5711:${REDIS_PORT}"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cdpack_network_cjda3
+
+  # 3. Back-end NestJS + Libs (@api-condopack/*) - Modo Dev / TDD
+  backend:
+    image: node:22-alpine
+    container_name: cdpack_backend-cjda3
+    working_dir: /workspace
+    restart: unless-stopped
+    command: sh -c "corepack enable && pnpm install && pnpm --filter ./backend start:dev"
+    env_file:
+      - .env
+    environment:
+      COREPACK_INTEGRITY_KEYS: "0"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      PNPM_STORE_DIR: /root/.local/share/pnpm/store
+      NODE_ENV: development
+      PORT: 5701
+      DB_PORT: 5432
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}
+      DB_TEST_NAME: condopack_test
+    ports:
+      - "5701:5701"
+    volumes:
+      - .:/workspace
+      - root_node_modules:/workspace/node_modules
+      - backend_node_modules:/workspace/backend/node_modules
+      - pnpm_store:/root/.local/share/pnpm/store
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5701/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - cdpack_network_cjda3
+
+  # 4. Front-end PWA + Libs (@web-condopack/*) - Modo Dev
+  frontend:
+    image: node:22-alpine
+    container_name: cdpack_frontend-cjda3
+    working_dir: /workspace
+    restart: unless-stopped
+    command: 'sh -c "corepack enable && pnpm install && pnpm --filter ./frontend dev --host :: --port 5700"'
+    env_file:
+      - .env
+    environment:
+      COREPACK_INTEGRITY_KEYS: "0"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      PNPM_STORE_DIR: /root/.local/share/pnpm/store
+      NODE_ENV: development
+      VITE_S3_BUCKET: ${S3_BUCKET_NAME}
+    ports:
+      - "5700:5700"
+    volumes:
+      - .:/workspace
+      - root_node_modules:/workspace/node_modules
+      - frontend_node_modules:/workspace/frontend/node_modules
+      - pnpm_store:/root/.local/share/pnpm/store
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5700 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - cdpack_network_cjda3
+
+networks:
+  cdpack_network_cjda3:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  root_node_modules:
+  backend_node_modules:
+  frontend_node_modules:
+  pnpm_store:
